@@ -7,10 +7,11 @@ import scipy.sparse as sp
 from sklearn import metrics
 from munkres import Munkres
 from kmeans_gpu import kmeans
+import kmeans_gpu
 from sklearn.metrics import adjusted_rand_score as ari_score
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
 import torch.nn.functional as F
-
+import utils
 
 def load_data(dataset):
     names = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
@@ -185,10 +186,21 @@ def clustering(feature, true_labels, cluster_num):
     return round(100 * acc, 2), round(100 * nmi, 2), round(100 * ari, 2), round(100 * f1, 2), predict_labels.numpy()
 
 
-def calculate_performance_loss(hidden_emb,true_labels,cluster_num):
-    predicted_labels = kmeans(X=hidden_emb,num_clusters=cluster_num,distance="euclidean",device= "cuda")
-    predicted_labels_one_hot = F.one_hot(predicted_labels, num_classes=cluster_num).float()
-    true_labels_one_hot = F.one_hot(true_labels, num_classes=cluster_num).float()
-    loss = F.cross_entropy(predicted_labels_one_hot, true_labels_one_hot)
+import torch
+import torch.nn.functional as F
+
+def calculate_performance_loss(hidden_emb, true_labels, cluster_num, num_iterations=100, lr=0.01, device=torch.device('cuda')):
+    hidden_emb = hidden_emb.to(device)
+
+    cluster_centers = kmeans_gpu.kmeanstrain(X=hidden_emb, num_clusters=cluster_num, num_iterations=num_iterations, lr=lr, device=device)
+
+    predicted_labels = kmeans_gpu.kmeans_predict(X=hidden_emb, cluster_centers=cluster_centers, distance="euclidean", device=device)
+    predicted_labels = predicted_labels.to(device).to(torch.int64)
+
+    true_labels = torch.tensor(true_labels, device=device).to(torch.int64)
+
+    loss = F.cross_entropy(predicted_labels, true_labels)
 
     return loss
+
+

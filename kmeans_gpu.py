@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+import torch.nn.functional as F
 
 def initialize(X, num_clusters):
     """
@@ -156,3 +156,36 @@ def pairwise_cosine(data1, data2, device=torch.device('cuda')):
     # return N*N matrix for pairwise distance
     cosine_dis = 1 - cosine.sum(dim=-1).squeeze()
     return cosine_dis
+
+def kmeanstrain(X, num_clusters, num_iterations=100, lr=0.01, device=torch.device('cuda')):
+    """
+    Trainable K-means using gradient descent.
+    :param X: (torch.tensor) data points
+    :param num_clusters: (int) number of clusters
+    :param num_iterations: (int) number of iterations
+    :param lr: (float) learning rate
+    :param device: (torch.device) computation device
+    :return: (torch.tensor) cluster centers
+    """
+    # Initialize cluster centers
+    cluster_centers = torch.randn(num_clusters, X.size(1), device=device, requires_grad=True)
+
+    # Optimizer
+    optimizer = torch.optim.SGD([cluster_centers], lr=lr)
+
+    for _ in range(num_iterations):
+        # Compute distances from data points to cluster centers
+        distances = pairwise_distance(X, cluster_centers)
+        # Assign clusters
+        labels = torch.argmin(distances, dim=1)
+
+        optimizer.zero_grad()
+
+        # Compute loss (mean distance to cluster center)
+        loss = F.mse_loss(X, cluster_centers[labels])
+        # Backpropagation
+        loss.backward()
+        # Update cluster centers
+        optimizer.step()
+
+    return cluster_centers.detach()

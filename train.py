@@ -118,7 +118,7 @@ for args.dataset in ["cora", "citeseer", "amap", "bat", "eat", "uat"]:
             optimizer.step()
             if epoch % 10 == 0:
                 model.eval()
-                z1, z2 , zi , zd , raw_weights= model(inx, is_train=False, sigma=args.sigma)
+                z1, z2 , zi , zd , raw_weights= model(inx,inx_i,inx_d, is_train=False, sigma=args.sigma)
                 weights = F.softmax(raw_weights,dim = 0)
                 hidden_emb = weights[0] * z1 + weights[1] * z2 + weights[2] * zi + weights[3] * zd
 
@@ -128,10 +128,10 @@ for args.dataset in ["cora", "citeseer", "amap", "bat", "eat", "uat"]:
                     best_nmi = nmi
                     best_ari = ari
                     best_f1 = f1
-                
-                performance_loss = calculate_performance_loss(hidden_emb, true_labels, args.cluster_num)
+
+                performance_loss = calculate_performance_loss(hidden_emb.detach(), true_labels, args.cluster_num)
                 weights_optimizer.zero_grad()
-                performance_loss.backward()
+                performance_loss.backward(retain_graph=True)
                 weights_optimizer.step()
         tqdm.write('acc: {}, nmi: {}, ari: {}, f1: {}'.format(best_acc, best_nmi, best_ari, best_f1))
         file = open("result_baseline.csv", "a+")

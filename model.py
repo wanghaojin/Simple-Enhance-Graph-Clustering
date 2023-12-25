@@ -12,6 +12,7 @@ class SEGC(nn.Module):
         self.weights = nn.Parameter(torch.ones(4)/4)
         
     def forward(self,x,x_increase,x_decrease,is_train=True,sigma = 0.01):
+        weights = self.weights
         out1 = self.layer1(x)
         out2 = self.layer2(x)
         out_increase = self.layer_increase(x_increase)
