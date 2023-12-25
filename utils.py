@@ -9,6 +9,7 @@ from munkres import Munkres
 from kmeans_gpu import kmeans
 from sklearn.metrics import adjusted_rand_score as ari_score
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
+import torch.nn.functional as F
 
 
 def load_data(dataset):
@@ -182,3 +183,12 @@ def clustering(feature, true_labels, cluster_num):
     predict_labels, _ = kmeans(X=feature, num_clusters=cluster_num, distance="euclidean", device="cuda")
     acc, nmi, ari, f1 = eva(true_labels, predict_labels.numpy(), show_details=False)
     return round(100 * acc, 2), round(100 * nmi, 2), round(100 * ari, 2), round(100 * f1, 2), predict_labels.numpy()
+
+
+def calculate_performance_loss(hidden_emb,true_labels,cluster_num):
+    predicted_labels = kmeans(X=hidden_emb,num_clusters=cluster_num,distance="euclidean",device= "cuda")
+    predicted_labels_one_hot = F.one_hot(predicted_labels, num_classes=cluster_num).float()
+    true_labels_one_hot = F.one_hot(true_labels, num_classes=cluster_num).float()
+    loss = F.cross_entropy(predicted_labels_one_hot, true_labels_one_hot)
+
+    return loss

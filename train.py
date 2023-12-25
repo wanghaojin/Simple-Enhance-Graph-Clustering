@@ -95,6 +95,7 @@ for args.dataset in ["cora", "citeseer", "amap", "bat", "eat", "uat"]:
         best_acc, best_nmi, best_ari, best_f1, prediect_labels = clustering(sm_fea_s, true_labels, args.cluster_num)
         model = SEGC([features.shape[1]] + args.dims)
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
+        weights_optimizer = torch.optim.Adam([model.weights], lr=args.lr)
         model = model.to(args.device)
         inx = sm_fea_s.to(args.device)
         #target的初始化也要修改
@@ -106,7 +107,7 @@ for args.dataset in ["cora", "citeseer", "amap", "bat", "eat", "uat"]:
         print('Start Training...')
         for epoch in tqdm(range(args.epochs)):
             model.train()
-            z1, z2 ,zi , zd = model(inx, inx_i,inx_d,is_train=True, sigma=args.sigma)
+            z1, z2 ,zi , zd , _ = model(inx, inx_i,inx_d,is_train=True, sigma=args.sigma)
             S1 = z1 @ z2.T
             S2 = z1 @ zi.T
             S3 = z1 @ zd.T
@@ -117,8 +118,9 @@ for args.dataset in ["cora", "citeseer", "amap", "bat", "eat", "uat"]:
             optimizer.step()
             if epoch % 10 == 0:
                 model.eval()
-                z1, z2 = model(inx, is_train=False, sigma=args.sigma)
-                hidden_emb = (z1 + z2 + zi + zd) / 4
+                z1, z2 , zi , zd , raw_weights= model(inx, is_train=False, sigma=args.sigma)
+                weights = F.softmax(raw_weights,dim = 0)
+                hidden_emb = weights[0] * z1 + weights[1] * z2 + weights[2] * zi + weights[3] * zd
 
                 acc, nmi, ari, f1, predict_labels = clustering(hidden_emb, true_labels, args.cluster_num)
                 if acc >= best_acc:
@@ -126,7 +128,11 @@ for args.dataset in ["cora", "citeseer", "amap", "bat", "eat", "uat"]:
                     best_nmi = nmi
                     best_ari = ari
                     best_f1 = f1
-
+                
+                performance_loss = calculate_performance_loss(hidden_emb, true_labels, args.cluster_num)
+                weights_optimizer.zero_grad()
+                performance_loss.backward()
+                weights_optimizer.step()
         tqdm.write('acc: {}, nmi: {}, ari: {}, f1: {}'.format(best_acc, best_nmi, best_ari, best_f1))
         file = open("result_baseline.csv", "a+")
         print(best_acc, best_nmi, best_ari, best_f1, file=file)
