@@ -1,33 +1,27 @@
-import numpy
-import torch
-import networkx as nx
-from scipy.sparse import coo_matrix
+import numpy as np
+from scipy.sparse import csr_matrix, identity
+from scipy.sparse.linalg import inv,expm
+from scipy.linalg import fractional_matrix_power
 
-def addedge(graph, num_edges_to_add):
-    """
-    Add edges to the graph to enhance the data.
-    
-    Args:
-    - graph (nx.Graph): The original graph.
-    - num_edges_to_add (int): Number of edges to add.
 
-    Returns:
-    - torch.Tensor: The enhanced adjacency matrix as a torch tensor.
-    """
-    nodes = list(graph.nodes())
-    num_nodes = len(nodes)
+def compute_ppr(csr_graph: csr_matrix, alpha=0.2, self_loop=True):
+    if self_loop:
+        csr_graph = csr_graph + identity(csr_graph.shape[0])
+    d = csr_graph.sum(axis=1).A1
+    d_inv_sqrt = np.reciprocal(np.sqrt(d))
+    d_inv_sqrt_mat = csr_matrix(np.diag(d_inv_sqrt))
+    at = d_inv_sqrt_mat @ csr_graph @ d_inv_sqrt_mat
+    return alpha * inv(identity(csr_graph.shape[0]) - (1 - alpha) * at)
 
-    # Add edges
-    for _ in range(num_edges_to_add):
-        # Randomly select two nodes
-        u, v = np.random.choice(num_nodes, 2, replace=False)
-        # Add an edge between these nodes
-        graph.add_edge(nodes[u], nodes[v])
 
-    # Create adjacency matrix
-    adj_matrix = nx.adjacency_matrix(graph)
-    
-    # Convert to torch tensor
-    adj_tensor = torch.FloatTensor(adj_matrix.toarray())
+def compute_heat(csr_graph: csr_matrix, t=5, self_loop=True):
+    if self_loop:
+        csr_graph = csr_graph + identity(csr_graph.shape[0])
+    d = csr_graph.sum(axis=1).A1
+    d_inv = np.reciprocal(d)
+    d_inv_mat = csr_matrix(np.diag(d_inv))
+    ad = csr_graph.dot(d_inv_mat)
+    heat_kernel = expm(t * (ad - identity(csr_graph.shape[0])))
+    return heat_kernel
 
-    return adj_tensor
+# def decrease_edge()
